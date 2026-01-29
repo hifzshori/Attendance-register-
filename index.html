@@ -9,6 +9,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <script>
+      // Polyfill process for browser environment to prevent "process is not defined" crashes
+      window.process = window.process || { env: {} };
+    </script>
+    <script>
       tailwind.config = {
         theme: {
           extend: {
@@ -69,5 +73,6 @@
 </head>
   <body class="bg-stone-100 text-ink-black">
     <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
   </body>
 </html>
