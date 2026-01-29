@@ -37,3 +37,15 @@ export const sendMessage = async (code: string, message: ChatMessage): Promise<v
     throw new Error('Failed to send message');
   }
 };
+
+export const deleteMessage = async (code: string, messageId: string): Promise<void> => {
+  const response = await fetch('/.netlify/functions/delete_message', {
+    method: 'POST',
+    body: JSON.stringify({ code, messageId }),
+    headers: { 'Content-Type': 'application/json' }
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to delete message');
+  }
+};

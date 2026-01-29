@@ -4,7 +4,7 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Student, SchoolClass, ChatMessage } from './types';
 import AIChat from './components/AIChat';
-import { shareClass, getClass, sendMessage } from './services/api';
+import { shareClass, getClass, sendMessage, deleteMessage } from './services/api';
 
 const SAMPLE_STUDENTS: Student[] = [
   { id: '1', name: 'Aarav Patel', rollNo: '01' },
@@ -36,6 +36,16 @@ const ChatInterface = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Generate a persistent session ID for students to identify their own messages
+  const [mySessionId] = useState(() => {
+    if (isTeacher) return 'teacher';
+    const stored = localStorage.getItem('student_session_id');
+    if (stored) return stored;
+    const newId = 'student_' + Date.now() + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem('student_session_id', newId);
+    return newId;
+  });
 
   // Poll for new messages every 3 seconds
   useEffect(() => {
@@ -69,7 +79,7 @@ const ChatInterface = ({
     setIsSending(true);
     const newMessage: ChatMessage = {
       id: Date.now().toString(),
-      senderId: isTeacher ? 'teacher' : 'student', // Simplified ID
+      senderId: mySessionId,
       senderName: isTeacher ? 'Teacher' : 'Student',
       content: inputText,
       timestamp: Date.now(),
@@ -86,6 +96,20 @@ const ChatInterface = ({
       alert("Failed to send message");
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const handleDelete = async (msgId: string) => {
+    if (!schoolClass.shareCode || !confirm("Delete this message?")) return;
+    
+    // Optimistic update
+    setMessages(prev => prev.filter(m => m.id !== msgId));
+
+    try {
+      await deleteMessage(schoolClass.shareCode, msgId);
+    } catch (e) {
+      alert("Failed to delete message");
+      // Revert optimization would require refetching, which polling handles
     }
   };
 
@@ -132,15 +156,26 @@ const ChatInterface = ({
             <p className="text-center text-stone-400 text-sm mt-10">No messages yet. Start the conversation!</p>
           )}
           {messages.map((msg) => {
-             const isMe = isTeacher ? msg.senderId === 'teacher' : msg.senderId !== 'teacher';
+             // Identify if the message is from "me" based on session ID
+             const isMe = msg.senderId === mySessionId;
+             // Teacher can delete any message, Student can only delete their own
+             const canDelete = isTeacher || isMe;
+             
              return (
-               <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                 <div className={`max-w-[85%] p-3 rounded-xl shadow-sm ${isMe ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white text-stone-800 rounded-bl-none'}`}>
-                    {msg.senderId !== (isTeacher ? 'teacher' : 'student') && (
-                       <p className={`text-xs font-bold mb-1 ${isMe ? 'text-blue-200' : 'text-blue-600'}`}>{msg.senderName}</p>
+               <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} group relative`}>
+                 <div className={`max-w-[85%] p-3 rounded-xl shadow-sm relative ${isMe ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white text-stone-800 rounded-bl-none'}`}>
+                    
+                    {/* Header: Name */}
+                    {msg.senderId !== mySessionId && (
+                       <p className={`text-xs font-bold mb-1 ${isMe ? 'text-blue-200' : 'text-blue-600'}`}>
+                         {msg.senderName} 
+                         {/* Fallback for older messages that might not have teacher vs student distinction clearly */}
+                         {msg.senderId === 'teacher' ? ' (Teacher)' : ''}
+                       </p>
                     )}
                     
-                    {msg.type === 'text' && <p className="text-sm">{msg.content}</p>}
+                    {/* Content */}
+                    {msg.type === 'text' && <p className="text-sm break-words">{msg.content}</p>}
                     
                     {msg.type === 'image' && (
                       <div className="mb-1">
@@ -158,6 +193,19 @@ const ChatInterface = ({
                       {new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                     </p>
                  </div>
+                 
+                 {/* Delete Button */}
+                 {canDelete && (
+                    <button 
+                        onClick={() => handleDelete(msg.id)}
+                        className={`absolute top-1/2 -translate-y-1/2 p-1.5 text-stone-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity
+                            ${isMe ? '-left-8' : '-right-8'}
+                        `}
+                        title="Delete message"
+                    >
+                        <Trash2 size={14} />
+                    </button>
+                 )}
                </div>
              );
           })}
@@ -812,46 +860,40 @@ export function App() {
                    <User size={24} /> Teacher's Desk
                 </h2>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="flex flex-col gap-3">
                   {classes.length === 0 ? (
-                      <div className="col-span-full flex flex-col items-center justify-center p-12 text-stone-400 border-2 border-dashed border-stone-300 rounded-xl bg-stone-50/50">
+                      <div className="flex flex-col items-center justify-center p-12 text-stone-400 border-2 border-dashed border-stone-300 rounded-xl bg-stone-50/50">
                           <BookOpen size={48} className="mb-4 opacity-50" />
                           <p className="font-sans text-xl">No saved classes.</p>
                           <p className="font-sans text-sm mt-2">Create a new class to get started.</p>
                       </div>
                   ) : (
                     classes.map(cls => (
-                      <div key={cls.id} className="group relative">
-                        <div className="absolute inset-0 rounded-xl transform translate-y-3 translate-x-3 bg-yellow-100 group-hover:translate-x-4 group-hover:translate-y-4 transition-transform"></div>
-                        <div 
-                          className="relative bg-[#fffdf0] rounded-xl border-2 border-stone-800 p-0 overflow-hidden h-full transition-all group-hover:-translate-y-1 cursor-pointer"
-                          onClick={() => { setActiveClassId(cls.id); setViewMode('register'); setActiveMonth(currentRealMonthName); }}
-                        >
-                          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-4 rotate-1 shadow-sm z-0 bg-yellow-300/80 pointer-events-none"></div>
-                          <div className="relative z-10 p-6 pt-10 flex flex-col h-full">
-                              <div className="flex justify-between items-start mb-6">
-                                <div className="w-14 h-14 rounded-full bg-white border-2 border-stone-800 flex items-center justify-center text-3xl font-bold text-ink-blue shadow-[2px_2px_0px_rgba(0,0,0,1)]">
-                                    {cls.name.charAt(0).toUpperCase()}
-                                </div>
-                                <button 
-                                    onClick={(e) => requestDeleteClass(e, cls)}
-                                    className="p-2 -mr-2 -mt-2 text-stone-300 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors z-20"
-                                >
-                                    <Trash2 size={20} />
-                                </button>
-                              </div>
-                              <h3 className="text-3xl font-bold text-ink-black mb-1 group-hover:text-ink-blue transition-colors line-clamp-1">{cls.name}</h3>
-                              <div className="h-px w-full bg-stone-200 my-4"></div>
-                              <div className="flex items-center gap-3 text-stone-600 font-sans mb-auto">
-                                <User size={18} /> <span className="font-semibold">{cls.students.length}</span> Students
-                              </div>
-                              <div className="mt-6 pt-4 border-t border-dashed border-stone-300 flex justify-between items-center">
-                                <span className="text-xs font-sans text-stone-400 font-medium">CREATED: {new Date(cls.createdAt).toLocaleDateString()}</span>
-                                <div className="w-8 h-8 rounded-full bg-stone-100 flex items-center justify-center text-stone-400 group-hover:bg-ink-blue group-hover:text-white transition-colors">
-                                    <ArrowRightCircle size={20} />
-                                </div>
-                              </div>
-                          </div>
+                      <div 
+                        key={cls.id} 
+                        className="flex items-center justify-between p-3 bg-white border border-stone-200 rounded-lg hover:border-ink-blue cursor-pointer group shadow-sm hover:shadow-md transition-all"
+                        onClick={() => { setActiveClassId(cls.id); setViewMode('register'); setActiveMonth(currentRealMonthName); }}
+                      >
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center font-bold text-lg font-sans shadow-sm">
+                                {cls.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                                <p className="font-bold text-base text-ink-black">{cls.name}</p>
+                                <p className="text-xs text-stone-500 font-sans flex items-center gap-1">
+                                    <User size={12} /> {cls.students.length} Students
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                             <button 
+                                onClick={(e) => requestDeleteClass(e, cls)}
+                                className="text-stone-300 hover:text-red-600 p-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Delete Class"
+                             >
+                                <Trash2 size={18} />
+                             </button>
+                             <ArrowRight size={18} className="text-stone-300 group-hover:text-ink-blue transition-colors" />
                         </div>
                       </div>
                     ))
