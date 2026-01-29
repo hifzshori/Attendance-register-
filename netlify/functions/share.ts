@@ -14,28 +14,28 @@ export default async (req: Request, context: Context) => {
       return new Response("Invalid class data", { status: 400 });
     }
 
-    // Generate a short 6-character code (Uppercase + Numbers, confusing chars removed)
+    // Generate a short 6-character code
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     let code = "";
     for (let i = 0; i < 6; i++) {
       code += chars.charAt(Math.floor(Math.random() * chars.length));
     }
 
-    // Connect to Netlify Blobs store called "attendance_shares"
-    // Note: Requires @netlify/blobs package and Netlify Blobs enabled on the site
     const store = getStore("attendance_shares");
     
-    // Store data. We also store a timestamp to handle expiry validation manually if needed,
-    // though for this demo we just store it.
+    // Store data with the code embedded.
+    // We remove the 'expiresAt' logic to make it lifetime.
+    // If a teacher shares again, a new code is generated, effectively "invalidating" the old one
+    // in the sense that the teacher will be looking at the new code's data stream.
     await store.setJSON(code, {
       ...data,
+      shareCode: code, // Embed the code so we know this is the valid one
       _sharedAt: Date.now()
     });
 
-    // Return the code
     return new Response(JSON.stringify({ 
-      code, 
-      expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString() // 1 hour expiry visual
+      code,
+      // No expiresAt returned implies lifetime
     }), {
       headers: { "Content-Type": "application/json" }
     });

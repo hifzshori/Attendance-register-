@@ -18,6 +18,17 @@ export enum ImageSize {
   SIZE_4K = '4K',
 }
 
+export interface ChatMessage {
+  id: string;
+  senderId: string;
+  senderName: string; // 'Teacher' or Student Name
+  content: string;
+  timestamp: number;
+  type: 'text' | 'image' | 'file';
+  fileUrl?: string; // Base64 for this implementation
+  fileName?: string;
+}
+
 // New structure: One Class has many months
 export interface SchoolClass {
   id: string;
@@ -25,6 +36,9 @@ export interface SchoolClass {
   students: Student[];
   // Map of Month Name (e.g. "September") -> Attendance Data
   attendance: Record<string, ClassAttendance>;
+  // Map of Month Name -> Array of day numbers that are holidays
+  holidays?: Record<string, number[]>;
   createdAt: number;
-  shareCode?: string; // For syncing with Firestore
+  shareCode?: string; // The active code for this class
+  messages?: ChatMessage[];
 }

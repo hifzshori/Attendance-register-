@@ -1,6 +1,6 @@
-import { SchoolClass } from '../types';
+import { SchoolClass, ChatMessage } from '../types';
 
-export const shareClass = async (classData: SchoolClass): Promise<{ code: string; expiresAt: string }> => {
+export const shareClass = async (classData: SchoolClass): Promise<{ code: string }> => {
   const response = await fetch('/.netlify/functions/share', {
     method: 'POST',
     body: JSON.stringify(classData),
@@ -19,9 +19,21 @@ export const getClass = async (code: string): Promise<SchoolClass> => {
   const response = await fetch(`/.netlify/functions/view?code=${encodeURIComponent(code)}`);
   
   if (!response.ok) {
-     if (response.status === 404) throw new Error('Code not found or expired.');
+     if (response.status === 404) throw new Error('Code not found.');
      throw new Error('Failed to retrieve class data.');
   }
 
   return response.json();
+};
+
+export const sendMessage = async (code: string, message: ChatMessage): Promise<void> => {
+  const response = await fetch('/.netlify/functions/send_message', {
+    method: 'POST',
+    body: JSON.stringify({ code, message }),
+    headers: { 'Content-Type': 'application/json' }
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to send message');
+  }
 };

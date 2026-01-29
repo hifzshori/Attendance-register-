@@ -14,16 +14,10 @@ export default async (req: Request, context: Context) => {
     const data: any = await store.get(code, { type: "json" });
 
     if (!data) {
-      return new Response("Code not found or expired", { status: 404 });
+      return new Response("Code not found.", { status: 404 });
     }
 
-    // Check Expiry (60 minutes)
-    const ONE_HOUR = 60 * 60 * 1000;
-    if (Date.now() - data._sharedAt > ONE_HOUR) {
-        // Optionally delete expired data
-        await store.delete(code);
-        return new Response("Code expired", { status: 410 });
-    }
+    // Lifetime access: No expiry check here.
 
     return new Response(JSON.stringify(data), {
       headers: { "Content-Type": "application/json" }

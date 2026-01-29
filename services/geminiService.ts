@@ -32,38 +32,48 @@ export const generateChatMessage = async (
   }
 };
 
-export const generateClassroomImage = async (prompt: string, size: ImageSize) => {
+export const generateClassroomImage = async (prompt: string, size: ImageSize): Promise<string> => {
   try {
     const ai = getAIInstance();
     
-    // Using the pro model for best quality image generation as per requirements for "code generation" (GenAI features)
-    const model = 'gemini-3-pro-image-preview';
-    
+    // Default to gemini-2.5-flash-image for 1K (standard quality)
+    let model = 'gemini-2.5-flash-image';
+    const imageConfig: any = {
+      aspectRatio: '1:1'
+    };
+
+    // Use gemini-3-pro-image-preview for high quality (2K, 4K)
+    if (size === ImageSize.SIZE_2K || size === ImageSize.SIZE_4K) {
+      model = 'gemini-3-pro-image-preview';
+      imageConfig.imageSize = size;
+    }
+
     const response = await ai.models.generateContent({
-      model: model,
+      model,
       contents: {
         parts: [{ text: prompt }]
       },
       config: {
-        imageConfig: {
-          imageSize: size,
-          aspectRatio: "1:1"
-        }
+        imageConfig
       }
     });
 
-    if (response.candidates && response.candidates[0].content.parts) {
-      for (const part of response.candidates[0].content.parts) {
-        if (part.inlineData) {
-          return `data:image/png;base64,${part.inlineData.data}`;
+    // Find the image part in the response
+    const candidates = response.candidates;
+    if (candidates && candidates.length > 0) {
+      const parts = candidates[0].content?.parts;
+      if (parts) {
+        for (const part of parts) {
+          if (part.inlineData && part.inlineData.data) {
+            return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+          }
         }
       }
     }
-    
-    throw new Error("No image generated.");
 
+    throw new Error("No image generated.");
   } catch (error) {
-    console.error("Image Gen Error:", error);
+    console.error("Image Generation Error:", error);
     throw error;
   }
 };

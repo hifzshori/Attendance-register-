@@ -36,17 +36,26 @@ const AIChat: React.FC<AIChatProps> = ({ onClose }) => {
     setLoading(true);
 
     try {
-      // Convert history format
-      const history = messages.map(m => ({
-        role: m.role,
-        parts: [{ text: m.text }]
-      }));
+      // Filter out the initial static greeting from history to avoid confusion
+      // or "model message first" errors from the API if strict alternation is required.
+      // We start history from the first real user interaction.
+      const history = messages
+        .filter((_, index) => index > 0) 
+        .map(m => ({
+          role: m.role,
+          parts: [{ text: m.text }]
+        }));
 
       const responseText = await generateChatMessage(userMsg, history);
       
       setMessages(prev => [...prev, { role: 'model', text: responseText || "I couldn't generate a response." }]);
-    } catch (error) {
-      setMessages(prev => [...prev, { role: 'model', text: "Sorry, I encountered an error. Please try again." }]);
+    } catch (error: any) {
+      console.error(error);
+      let errorMsg = "Sorry, I encountered an error. Please try again.";
+      if (error.message && error.message.includes("API Key")) {
+        errorMsg = "API Key missing. Please configure the API_KEY environment variable.";
+      }
+      setMessages(prev => [...prev, { role: 'model', text: errorMsg }]);
     } finally {
       setLoading(false);
     }
