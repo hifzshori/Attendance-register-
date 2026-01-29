@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, BookOpen, ChevronLeft, LayoutGrid, User, Calendar, Save, ArrowRightCircle, Download, Check, AlertTriangle, X, Bot, Lock, Cloud, Globe, ArrowRight, Sun, MessageCircle, Paperclip, FileText, Image as ImageIcon, Send } from 'lucide-react';
+import { Plus, Trash2, BookOpen, ChevronLeft, LayoutGrid, User, Calendar, Save, ArrowRightCircle, Download, Check, AlertTriangle, X, Bot, Lock, Cloud, Globe, ArrowRight, Sun, MessageCircle, Paperclip, FileText, Image as ImageIcon, Send, Loader2 } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Student, SchoolClass, ChatMessage } from './types';
@@ -32,7 +32,6 @@ const ChatInterface = ({
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>(schoolClass.messages || []);
   const [inputText, setInputText] = useState('');
-  const [isSending, setIsSending] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -54,7 +53,14 @@ const ChatInterface = ({
       try {
         const updatedClass = await getClass(schoolClass.shareCode);
         if (updatedClass.messages) {
-          setMessages(updatedClass.messages);
+          // Merge logic to avoid overwriting pending messages
+          setMessages(prev => {
+            const pending = prev.filter(m => m.isPending);
+            const serverMessages = updatedClass.messages || [];
+            // Basic deduping could be done here if needed, but replacing server messages is usually safer
+            // We append pending messages at the end to keep them visible
+            return [...serverMessages, ...pending];
+          });
         }
       } catch (e) {
         console.error("Polling error", e);
@@ -76,26 +82,33 @@ const ChatInterface = ({
   const handleSend = async (file?: { url: string, name: string, type: 'image' | 'file' }) => {
     if ((!inputText.trim() && !file) || !schoolClass.shareCode) return;
 
-    setIsSending(true);
+    const tempId = Date.now().toString();
     const newMessage: ChatMessage = {
-      id: Date.now().toString(),
+      id: tempId,
       senderId: mySessionId,
       senderName: isTeacher ? 'Teacher' : 'Student',
       content: inputText,
       timestamp: Date.now(),
       type: file ? file.type : 'text',
       fileUrl: file?.url,
-      fileName: file?.name
+      fileName: file?.name,
+      isPending: true // Mark as pending for UI
     };
 
+    // Optimistic Update
+    setMessages(prev => [...prev, newMessage]);
+    setInputText('');
+
     try {
-      await sendMessage(schoolClass.shareCode, newMessage);
-      setMessages(prev => [...prev, newMessage]);
-      setInputText('');
+      // Send to API (exclude isPending)
+      const { isPending, ...messagePayload } = newMessage;
+      await sendMessage(schoolClass.shareCode, messagePayload);
+      
+      // Update local state to remove pending status
+      setMessages(prev => prev.map(m => m.id === tempId ? { ...m, isPending: false } : m));
     } catch (e) {
       alert("Failed to send message");
-    } finally {
-      setIsSending(false);
+      setMessages(prev => prev.filter(m => m.id !== tempId)); // Remove failed message
     }
   };
 
@@ -129,6 +142,8 @@ const ChatInterface = ({
       handleSend({ url: base64, name: file.name, type });
     };
     reader.readAsDataURL(file);
+    // Reset input so same file can be selected again
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   return (
@@ -159,17 +174,16 @@ const ChatInterface = ({
              // Identify if the message is from "me" based on session ID
              const isMe = msg.senderId === mySessionId;
              // Teacher can delete any message, Student can only delete their own
-             const canDelete = isTeacher || isMe;
+             const canDelete = !msg.isPending && (isTeacher || isMe);
              
              return (
-               <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} group relative`}>
-                 <div className={`max-w-[85%] p-3 rounded-xl shadow-sm relative ${isMe ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white text-stone-800 rounded-bl-none'}`}>
+               <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} group relative mb-4`}>
+                 <div className={`max-w-[85%] p-3 rounded-xl shadow-sm relative transition-opacity ${msg.isPending ? 'opacity-70' : 'opacity-100'} ${isMe ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white text-stone-800 rounded-bl-none'}`}>
                     
                     {/* Header: Name */}
                     {msg.senderId !== mySessionId && (
                        <p className={`text-xs font-bold mb-1 ${isMe ? 'text-blue-200' : 'text-blue-600'}`}>
                          {msg.senderName} 
-                         {/* Fallback for older messages that might not have teacher vs student distinction clearly */}
                          {msg.senderId === 'teacher' ? ' (Teacher)' : ''}
                        </p>
                     )}
@@ -189,17 +203,22 @@ const ChatInterface = ({
                       </a>
                     )}
                     
-                    <p className={`text-[10px] mt-1 text-right ${isMe ? 'text-blue-200' : 'text-stone-400'}`}>
-                      {new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    </p>
+                    <div className="flex items-center justify-end gap-1 mt-1">
+                      <p className={`text-[10px] ${isMe ? 'text-blue-200' : 'text-stone-400'}`}>
+                        {new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                      </p>
+                      {msg.isPending && (
+                        <Loader2 size={12} className={`animate-spin ${isMe ? 'text-blue-200' : 'text-stone-400'}`} />
+                      )}
+                    </div>
                  </div>
                  
-                 {/* Delete Button */}
+                 {/* Delete Button - Always Visible */}
                  {canDelete && (
                     <button 
                         onClick={() => handleDelete(msg.id)}
-                        className={`absolute top-1/2 -translate-y-1/2 p-1.5 text-stone-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity
-                            ${isMe ? '-left-8' : '-right-8'}
+                        className={`absolute top-2 p-1.5 bg-stone-200 text-stone-500 rounded-full hover:bg-red-100 hover:text-red-600 transition-colors shadow-sm
+                            ${isMe ? '-left-10' : '-right-10'}
                         `}
                         title="Delete message"
                     >
@@ -236,7 +255,7 @@ const ChatInterface = ({
           />
           <button 
             onClick={() => handleSend()}
-            disabled={isSending || (!inputText && !fileInputRef.current?.files?.length)}
+            disabled={(!inputText && !fileInputRef.current?.files?.length)}
             className="bg-ink-blue text-white p-2.5 rounded-full hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
             <Send size={18} />
@@ -888,7 +907,7 @@ export function App() {
                         <div className="flex items-center gap-2">
                              <button 
                                 onClick={(e) => requestDeleteClass(e, cls)}
-                                className="text-stone-300 hover:text-red-600 p-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                                className="text-stone-300 hover:text-red-600 p-2"
                                 title="Delete Class"
                              >
                                 <Trash2 size={18} />

@@ -27,6 +27,7 @@ export interface ChatMessage {
   type: 'text' | 'image' | 'file';
   fileUrl?: string; // Base64 for this implementation
   fileName?: string;
+  isPending?: boolean; // UI only state for optimistic updates
 }
 
 // New structure: One Class has many months
