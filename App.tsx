@@ -355,7 +355,7 @@ const ChatInterface = ({
              
              return (
                <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} group relative mb-4`}>
-                 <div className={`max-w-[85%] p-3 rounded-xl shadow-sm relative transition-opacity ${msg.isPending ? 'opacity-70' : 'opacity-100'} ${isMe ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white text-stone-800 rounded-bl-none'}`}>
+                 <div className={`max-w-[85%] p-3 pr-10 rounded-xl shadow-sm relative transition-opacity ${msg.isPending ? 'opacity-70' : 'opacity-100'} ${isMe ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white text-stone-800 rounded-bl-none'}`}>
                     {msg.senderId !== mySessionId && (
                        <p className={`text-xs font-bold mb-1 ${isMe ? 'text-blue-200' : 'text-blue-600'}`}>
                          {msg.senderName} 
@@ -385,19 +385,19 @@ const ChatInterface = ({
                         <Loader2 size={12} className={`animate-spin ${isMe ? 'text-blue-200' : 'text-stone-400'}`} />
                       )}
                     </div>
+
+                    {canDelete && (
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); handleDelete(msg.id); }}
+                            className={`absolute top-2 right-2 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity
+                                ${isMe ? 'bg-blue-500 text-blue-100 hover:bg-blue-700 hover:text-white' : 'bg-stone-100 text-stone-400 hover:bg-red-100 hover:text-red-600'}
+                            `}
+                            title="Delete message"
+                        >
+                            <Trash2 size={14} />
+                        </button>
+                    )}
                  </div>
-                 
-                 {canDelete && (
-                    <button 
-                        onClick={() => handleDelete(msg.id)}
-                        className={`absolute top-2 p-1.5 bg-stone-200 text-stone-500 rounded-full hover:bg-red-100 hover:text-red-600 transition-colors shadow-sm
-                            ${isMe ? '-left-10' : '-right-10'}
-                        `}
-                        title="Delete message"
-                    >
-                        <Trash2 size={14} />
-                    </button>
-                 )}
                </div>
              );
           })}
