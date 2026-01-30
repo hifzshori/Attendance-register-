@@ -16,7 +16,8 @@
     "jspdf": "2.5.1",
     "jspdf-autotable": "3.8.2",
     "@netlify/functions": "^5.1.2",
-    "@netlify/blobs": "^10.5.0"
+    "@netlify/blobs": "^10.5.0",
+    "crypto": "^1.0.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

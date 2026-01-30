@@ -7,10 +7,10 @@ export default async (req: Request, context: Context) => {
   }
 
   try {
-    const { code, messageId } = await req.json();
+    const { code, messageId, senderId } = await req.json();
 
-    if (!code || !messageId) {
-      return new Response("Missing code or messageId", { status: 400 });
+    if (!code || !messageId || !senderId) {
+      return new Response("Missing code, messageId, or senderId", { status: 400 });
     }
 
     const store = getStore("attendance_shares");
@@ -21,6 +21,19 @@ export default async (req: Request, context: Context) => {
     }
 
     const messages = data.messages || [];
+    const messageToDelete = messages.find((m: any) => m.id === messageId);
+
+    if (!messageToDelete) {
+        return new Response("Message not found", { status: 404 });
+    }
+
+    // Authorization Check:
+    // 1. Teacher can delete any message.
+    // 2. Students can only delete their own messages.
+    if (senderId !== 'teacher' && messageToDelete.senderId !== senderId) {
+        return new Response("Unauthorized to delete this message", { status: 403 });
+    }
+
     const updatedMessages = messages.filter((m: any) => m.id !== messageId);
 
     await store.setJSON(code, {

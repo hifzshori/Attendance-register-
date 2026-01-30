@@ -42,4 +42,5 @@ export interface SchoolClass {
   createdAt: number;
   shareCode?: string; // The active code for this class
   messages?: ChatMessage[];
+  isChatLocked?: boolean;
 }

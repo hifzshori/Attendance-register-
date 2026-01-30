@@ -34,18 +34,69 @@ export const sendMessage = async (code: string, message: ChatMessage): Promise<v
   });
 
   if (!response.ok) {
-    throw new Error('Failed to send message');
+    const text = await response.text();
+    throw new Error(text || 'Failed to send message');
   }
 };
 
-export const deleteMessage = async (code: string, messageId: string): Promise<void> => {
+export const deleteMessage = async (code: string, messageId: string, senderId: string): Promise<void> => {
   const response = await fetch('/.netlify/functions/delete_message', {
     method: 'POST',
-    body: JSON.stringify({ code, messageId }),
+    body: JSON.stringify({ code, messageId, senderId }),
     headers: { 'Content-Type': 'application/json' }
   });
 
   if (!response.ok) {
     throw new Error('Failed to delete message');
+  }
+};
+
+export const toggleChatLock = async (code: string, isLocked: boolean, senderId: string): Promise<void> => {
+  const response = await fetch('/.netlify/functions/toggle_lock', {
+    method: 'POST',
+    body: JSON.stringify({ code, isLocked, senderId }),
+    headers: { 'Content-Type': 'application/json' }
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to update chat lock state');
+  }
+};
+
+export const loginUser = async (email: string, password: string): Promise<{ success: boolean; token?: string; user?: any; error?: string }> => {
+  try {
+    const response = await fetch('/.netlify/functions/auth_login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    const data = await response.json();
+    if (response.ok && data.success) {
+      return { success: true, token: data.token, user: data.user };
+    }
+    return { success: false, error: data.error || 'Login failed' };
+  } catch (e) {
+    console.error("Login API Error", e);
+    return { success: false, error: 'Network error' };
+  }
+};
+
+export const signupUser = async (name: string, email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const response = await fetch('/.netlify/functions/auth_signup', {
+      method: 'POST',
+      body: JSON.stringify({ name, email, password }),
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    const data = await response.json();
+    if (response.ok && data.success) {
+      return { success: true };
+    }
+    return { success: false, error: data.error || 'Signup failed' };
+  } catch (e) {
+    console.error("Signup API Error", e);
+    return { success: false, error: 'Network error' };
   }
 };
