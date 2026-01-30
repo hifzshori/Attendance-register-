@@ -192,7 +192,6 @@ const ChatInterface = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Generate a persistent session ID for students to identify their own messages
   const [mySessionId] = useState(() => {
     if (isTeacher) return 'teacher';
     const stored = localStorage.getItem('student_session_id');
@@ -202,25 +201,20 @@ const ChatInterface = ({
     return newId;
   });
 
-  // Poll for new messages every 3 seconds
   useEffect(() => {
     const fetchMessages = async () => {
       if (!schoolClass.shareCode) return;
       try {
         const updatedClass = await getClass(schoolClass.shareCode);
         
-        // Update Lock State
         if (updatedClass.isChatLocked !== undefined) {
            setIsLocked(updatedClass.isChatLocked);
         }
 
         if (updatedClass.messages) {
-          // Merge logic to avoid overwriting pending messages
           setMessages(prev => {
             const pending = prev.filter(m => m.isPending);
             const serverMessages = updatedClass.messages || [];
-            // We append pending messages at the end to keep them visible
-            // In a real app we would de-dupe by ID
             return [...serverMessages, ...pending];
           });
         }
@@ -229,7 +223,7 @@ const ChatInterface = ({
       }
     };
 
-    fetchMessages(); // Initial fetch
+    fetchMessages();
     pollingRef.current = setInterval(fetchMessages, 3000);
 
     return () => {
@@ -259,51 +253,40 @@ const ChatInterface = ({
       type: file ? file.type : 'text',
       fileUrl: file?.url,
       fileName: file?.name,
-      isPending: true // Mark as pending for UI
+      isPending: true
     };
 
-    // Optimistic Update
     setMessages(prev => [...prev, newMessage]);
     setInputText('');
 
     try {
-      // Send to API (exclude isPending)
       const { isPending, ...messagePayload } = newMessage;
       await sendMessage(schoolClass.shareCode, messagePayload);
-      
-      // Update local state to remove pending status
       setMessages(prev => prev.map(m => m.id === tempId ? { ...m, isPending: false } : m));
     } catch (e: any) {
       alert(e.message || "Failed to send message");
-      setMessages(prev => prev.filter(m => m.id !== tempId)); // Remove failed message
+      setMessages(prev => prev.filter(m => m.id !== tempId));
     }
   };
 
   const handleDelete = async (msgId: string) => {
     if (!schoolClass.shareCode || !confirm("Delete this message?")) return;
-    
-    // Optimistic update
     setMessages(prev => prev.filter(m => m.id !== msgId));
-
     try {
       await deleteMessage(schoolClass.shareCode, msgId, mySessionId);
     } catch (e) {
       alert("Failed to delete message");
-      // Revert is hard without re-fetch, polling will eventually fix it or we could undo here
     }
   };
 
   const handleToggleLock = async () => {
     if (!isTeacher || !schoolClass.shareCode) return;
-    
     const newState = !isLocked;
-    // Optimistic update
     setIsLocked(newState);
-
     try {
         await toggleChatLock(schoolClass.shareCode, newState, mySessionId);
     } catch (e) {
-        setIsLocked(!newState); // Revert
+        setIsLocked(!newState);
         alert("Failed to update lock state");
     }
   };
@@ -312,7 +295,7 @@ const ChatInterface = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 500 * 1024) { // 500KB limit for this demo using Blobs
+    if (file.size > 500 * 1024) { 
       alert("File too large. Max 500KB.");
       return;
     }
@@ -324,7 +307,6 @@ const ChatInterface = ({
       handleSend({ url: base64, name: file.name, type });
     };
     reader.readAsDataURL(file);
-    // Reset input so same file can be selected again
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -333,7 +315,6 @@ const ChatInterface = ({
   return (
     <div className="fixed inset-0 z-[200] bg-black/50 flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-md h-[80vh] rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in duration-200">
-        {/* Header */}
         <div className="bg-ink-blue p-4 text-white flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="bg-white/20 p-2 rounded-full">
@@ -363,24 +344,18 @@ const ChatInterface = ({
           </div>
         </div>
 
-        {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 bg-stone-100 space-y-3 relative">
           {messages.length === 0 && (
             <p className="text-center text-stone-400 text-sm mt-10">No messages yet. Start the conversation!</p>
           )}
           
           {messages.map((msg) => {
-             // Identify if the message is from "me" based on session ID
              const isMe = msg.senderId === mySessionId;
-             // Teacher can delete any message, Student can only delete their own
-             // Also cannot delete pending messages
              const canDelete = !msg.isPending && (isTeacher || isMe);
              
              return (
                <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} group relative mb-4`}>
                  <div className={`max-w-[85%] p-3 rounded-xl shadow-sm relative transition-opacity ${msg.isPending ? 'opacity-70' : 'opacity-100'} ${isMe ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white text-stone-800 rounded-bl-none'}`}>
-                    
-                    {/* Header: Name */}
                     {msg.senderId !== mySessionId && (
                        <p className={`text-xs font-bold mb-1 ${isMe ? 'text-blue-200' : 'text-blue-600'}`}>
                          {msg.senderName} 
@@ -388,7 +363,6 @@ const ChatInterface = ({
                        </p>
                     )}
                     
-                    {/* Content */}
                     {msg.type === 'text' && <p className="text-sm break-words">{msg.content}</p>}
                     
                     {msg.type === 'image' && (
@@ -413,7 +387,6 @@ const ChatInterface = ({
                     </div>
                  </div>
                  
-                 {/* Delete Button - Always Visible */}
                  {canDelete && (
                     <button 
                         onClick={() => handleDelete(msg.id)}
@@ -431,7 +404,6 @@ const ChatInterface = ({
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input */}
         <div className={`p-3 bg-white border-t border-stone-200 flex gap-2 items-center relative ${isInputDisabled ? 'bg-stone-50' : ''}`}>
           {isInputDisabled && (
             <div className="absolute inset-0 bg-stone-100/60 z-10 flex items-center justify-center backdrop-blur-[1px]">
@@ -553,7 +525,6 @@ const ShareModal = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
       setCode(classData.shareCode || null);
@@ -638,9 +609,6 @@ const Toast = ({ message, isVisible }: { message: string, isVisible: boolean }) 
 };
 
 export function App() {
-  // --- STATE ---
-  
-  // 1. Data Source
   const [classes, setClasses] = useState<SchoolClass[]>(() => {
     try {
       const saved = localStorage.getItem('school_classes');
@@ -659,7 +627,6 @@ export function App() {
     } catch (e) { return []; }
   });
 
-  // 2. Auth & Navigation
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return !!localStorage.getItem('auth_token');
   });
@@ -670,7 +637,7 @@ export function App() {
   });
 
   const [activeClassId, setActiveClassId] = useState<string | null>(null);
-  const [sharedClassData, setSharedClassData] = useState<SchoolClass | null>(null); // For Viewer Mode
+  const [sharedClassData, setSharedClassData] = useState<SchoolClass | null>(null);
   
   const currentRealDate = new Date();
   const currentRealDay = currentRealDate.getDate();
@@ -678,9 +645,8 @@ export function App() {
 
   const [activeMonth, setActiveMonth] = useState<string>(currentRealMonthName);
   const [viewMode, setViewMode] = useState<'login' | 'home' | 'create-name' | 'register'>('login');
-  const [isViewerMode, setIsViewerMode] = useState(false); // READ-ONLY MODE
+  const [isViewerMode, setIsViewerMode] = useState(false);
 
-  // 3. UI Features State
   const [deleteModal, setDeleteModal] = useState<{ 
     isOpen: boolean; 
     type: 'class' | 'student'; 
@@ -693,24 +659,18 @@ export function App() {
   const [newStudentName, setNewStudentName] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-  
-  // Chat State
   const [isChatOpen, setIsChatOpen] = useState(false);
 
-  // Viewer Code Input (For join error handling in Login Page)
   const [viewerCode, setViewerCode] = useState('');
   const [viewerLoading, setViewerLoading] = useState(false);
   const [viewerError, setViewerError] = useState<string | null>(null);
   const [showAddCodeModal, setShowAddCodeModal] = useState(false);
   
-  // 4. AI Features State
   const [showAIChat, setShowAIChat] = useState(false);
 
-  // Refs
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const currentDayRef = useRef<HTMLTableCellElement>(null);
 
-  // --- PERSISTENCE ---
   useEffect(() => {
     localStorage.setItem('school_classes', JSON.stringify(classes));
   }, [classes]);
@@ -731,7 +691,6 @@ export function App() {
      }
   }, [isAuthenticated]);
 
-  // Scroll Logic
   const scrollToToday = () => {
     if (activeMonth === currentRealMonthName && currentDayRef.current && scrollContainerRef.current) {
         const container = scrollContainerRef.current;
@@ -757,12 +716,9 @@ export function App() {
     }
   }, [viewMode, activeMonth, activeClassId, currentRealMonthName]);
 
-  // --- HELPER FUNCTIONS ---
-
   const getDaysInMonth = (monthName: string) => {
     const monthIndex = MONTHS.indexOf(monthName);
     const year = new Date().getFullYear();
-    // Day 0 of next month is the last day of current month
     return new Date(year, monthIndex + 1, 0).getDate();
   };
 
@@ -779,8 +735,6 @@ export function App() {
      return date.getDay() === 0;
   };
 
-  // --- ACTIONS ---
-
   const handleLogin = async (email: string, password: string) => {
       const result = await loginUser(email, password);
       if (result.success && result.token) {
@@ -789,7 +743,7 @@ export function App() {
           localStorage.setItem('auth_token', result.token);
           if (result.user) localStorage.setItem('auth_user', JSON.stringify(result.user));
           setViewMode('home');
-          return undefined; // No error
+          return undefined; 
       }
       return result.error || 'Login failed';
   };
@@ -799,7 +753,6 @@ export function App() {
       setUser(null);
       localStorage.removeItem('auth_token');
       localStorage.removeItem('auth_user');
-      // Also clear old legacy items
       localStorage.removeItem('is_teacher_authenticated');
       setViewMode('login');
       setActiveClassId(null);
@@ -849,7 +802,6 @@ export function App() {
       setViewMode('register');
       setActiveMonth(currentRealMonthName);
       
-      // Save valid code
       saveStudentCode(codeToUse.trim(), data.name);
       setViewerCode('');
       setShowAddCodeModal(false);
@@ -925,8 +877,6 @@ export function App() {
         setViewMode('login');
     }
   };
-
-  // --- REGISTER LOGIC ---
 
   const handleCellClick = (studentId: string, day: number, isHoliday: boolean) => {
     if (!activeClassId || isViewerMode || isHoliday) return;
@@ -1048,13 +998,10 @@ export function App() {
     doc.save(`${targetClass.name.replace(/\s+/g, '_')}_${activeMonth}_Attendance.pdf`);
   };
 
-  // --- COMPUTED ---
   const activeClass = isViewerMode ? sharedClassData : classes.find(c => c.id === activeClassId);
   const numDays = getDaysInMonth(activeMonth);
   const days = Array.from({ length: numDays }, (_, i) => i + 1);
   const isCurrentMonthActive = activeMonth === currentRealMonthName;
-
-  // --- RENDERERS ---
 
   if (!isAuthenticated && !isViewerMode && viewMode === 'login') {
       return (
@@ -1259,4 +1206,291 @@ export function App() {
 
   // REGISTER VIEW
   if (!activeClass) return null;
-  // ... (rest of the component remains unchanged)
+
+  const getStudentStats = (studentId: string) => {
+    const record = activeClass.attendance[activeMonth]?.[studentId];
+    if (!record) return { presents: 0, absents: 0 };
+    
+    let presents = 0;
+    let absents = 0;
+    
+    days.forEach(day => {
+        const isSun = isSunday(day, activeMonth);
+        const isHol = activeClass.holidays?.[activeMonth]?.includes(day) || isSun;
+        if (isHol) return;
+        
+        const status = record[day];
+        if (status === 'P') presents++;
+        if (status === 'A') absents++;
+    });
+
+    return { presents, absents };
+  };
+
+  return (
+    <div className="min-h-screen bg-stone-200 p-2 md:p-8 font-hand relative">
+      <Toast message={toast.message} isVisible={toast.show} />
+      
+      {showAIChat && <AIChat onClose={() => setShowAIChat(false)} />}
+      
+      {isChatOpen && activeClass && (
+         <ChatInterface 
+            schoolClass={activeClass}
+            isTeacher={!isViewerMode}
+            onClose={() => setIsChatOpen(false)}
+         />
+      )}
+
+      {showAddCodeModal && (
+        <div className="fixed inset-0 z-[200] bg-black/50 flex items-center justify-center p-4">
+             <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
+                 <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-bold text-lg">Join Another Class</h3>
+                    <button onClick={() => setShowAddCodeModal(false)}><X size={20}/></button>
+                 </div>
+                 <div className="space-y-3">
+                       <input 
+                         type="text" 
+                         value={viewerCode}
+                         onChange={(e) => setViewerCode(e.target.value.toUpperCase())}
+                         placeholder="Enter Code (e.g. X9Y2Z1)"
+                         className="w-full text-center text-2xl font-mono p-3 border-2 border-stone-300 rounded focus:border-ink-blue focus:outline-none tracking-widest uppercase"
+                         maxLength={6}
+                         onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                handleJoinClass((e.target as HTMLInputElement).value.toUpperCase());
+                            }
+                         }}
+                       />
+                       <p className="text-xs text-stone-500 text-center">Press Enter to join</p>
+                 </div>
+             </div>
+        </div>
+      )}
+
+      <DeleteModal 
+          isOpen={deleteModal.isOpen} 
+          type={deleteModal.type}
+          name={deleteModal.itemName} 
+          onClose={() => setDeleteModal({ ...deleteModal, isOpen: false })}
+          onConfirm={confirmDelete}
+      />
+
+      <ShareModal 
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        classData={activeClass}
+        onCodeGenerated={(code) => {
+            updateActiveClass(c => ({ ...c, shareCode: code }));
+        }}
+      />
+      
+      {!isViewerMode && (
+        <div className="fixed bottom-6 right-6 flex flex-col gap-3 z-50">
+          <button 
+            onClick={() => setShowAIChat(true)}
+            className="w-12 h-12 bg-white rounded-full shadow-lg border border-stone-200 flex items-center justify-center text-ink-blue hover:bg-blue-50 transition-all hover:scale-110"
+            title="Teaching Assistant"
+          >
+            <Bot size={24} />
+          </button>
+        </div>
+      )}
+
+      <div className="max-w-[98vw] mx-auto mb-2 flex flex-col md:flex-row justify-between items-start gap-4">
+        <div className="flex items-center gap-4">
+           <button onClick={goHome} className="bg-white p-2 rounded-full shadow hover:bg-stone-100 text-stone-600">
+             <LayoutGrid size={20} />
+           </button>
+           <div>
+              <h1 className="text-3xl md:text-5xl font-bold text-ink-black tracking-wide mb-1 flex items-center gap-3">
+                  {activeClass.name}
+                  {isViewerMode && (
+                    <span className="text-xs bg-stone-800 text-white px-3 py-1.5 rounded-full font-sans uppercase tracking-widest flex items-center gap-2 shadow-lg">
+                      <Lock size={12} /> View Only
+                    </span>
+                  )}
+              </h1>
+              <p className="text-stone-600 font-sans italic text-sm md:text-lg flex items-center gap-2">
+                 <Save size={14} className="text-green-600"/> {isViewerMode ? 'Read Only Mode' : 'Auto-saved to browser'}
+              </p>
+           </div>
+        </div>
+        
+        <div className="flex gap-2 md:gap-3 items-center flex-wrap">
+            <button 
+                onClick={() => {
+                    if (isViewerMode || activeClass.shareCode) {
+                        setIsChatOpen(true);
+                    } else {
+                        setToast({show: true, message: "Share the class first to enable chat!"});
+                        setTimeout(() => setToast(prev => ({...prev, show: false})), 3000);
+                        setIsShareModalOpen(true);
+                    }
+                }} 
+                className="flex items-center gap-2 bg-purple-600 text-white px-3 py-1.5 md:px-4 md:py-2 rounded shadow hover:bg-purple-700 font-sans transition-colors text-sm md:text-base"
+            >
+                <MessageCircle size={18} /> <span className="hidden md:inline">Chat</span>
+            </button>
+
+            {isViewerMode && (
+                <button onClick={() => setShowAddCodeModal(true)} className="flex items-center gap-2 bg-stone-100 text-stone-700 border border-stone-300 px-3 py-1.5 md:px-4 md:py-2 rounded shadow hover:bg-stone-200 font-sans transition-colors text-sm md:text-base">
+                    <Plus size={18} /> <span className="hidden md:inline">Join Another</span>
+                </button>
+            )}
+
+            {!isViewerMode ? (
+            <>
+                <button onClick={() => setIsShareModalOpen(true)} className="flex items-center gap-2 bg-ink-blue text-white px-3 py-1.5 md:px-4 md:py-2 rounded-lg shadow hover:bg-blue-700 font-sans transition-colors text-sm md:text-base">
+                    <Cloud size={18} /> <span className="hidden md:inline">Share</span>
+                </button>
+                <button onClick={() => setIsAddModalOpen(true)} className="flex items-center gap-2 bg-emerald-600 text-white px-3 py-1.5 md:px-4 md:py-2 rounded shadow hover:bg-emerald-700 font-sans transition-colors text-sm md:text-base">
+                    <Plus size={18} /> <span className="hidden md:inline">Add Student</span>
+                </button>
+            </>
+            ) : null}
+            
+            <button onClick={downloadPDF} className="flex items-center gap-2 bg-stone-600 text-white px-3 py-1.5 md:px-4 md:py-2 rounded shadow hover:bg-stone-700 font-sans transition-colors text-sm md:text-base">
+                <Download size={18} /> <span className="hidden md:inline">PDF</span>
+            </button>
+        </div>
+      </div>
+
+      <div className="max-w-[98vw] mx-auto mb-0 overflow-x-auto flex gap-1 pb-2 border-b-2 border-transparent">
+         {MONTHS.map(m => (
+             <button
+                key={m}
+                onClick={() => setActiveMonth(m)}
+                className={`px-3 md:px-5 py-2 rounded-t-lg font-sans text-sm font-medium transition-all whitespace-nowrap
+                    ${activeMonth === m 
+                        ? 'bg-paper text-ink-blue border-t border-x border-stone-300 shadow-[0_-2px_4px_rgba(0,0,0,0.05)] translate-y-[1px] z-10' 
+                        : 'bg-stone-300 text-stone-600 hover:bg-stone-200'
+                    }`}
+             >
+                 {m}
+             </button>
+         ))}
+      </div>
+
+      <div className="max-w-[98vw] mx-auto bg-paper shadow-paper rounded-b-sm rounded-tr-sm overflow-hidden border-2 border-stone-900 relative">
+        <div className="absolute top-0 bottom-0 left-[8.5rem] md:left-[16rem] w-[2.5rem] md:w-[6rem] border-x-2 border-ink-red pointer-events-none z-50"></div>
+        <div className="absolute top-0 bottom-0 right-12 md:right-16 w-12 md:w-16 border-l-2 border-ink-black pointer-events-none z-50"></div>
+        <div className="absolute top-0 bottom-0 right-0 w-12 md:w-16 border-x-2 border-ink-black pointer-events-none z-50"></div>
+
+        <div ref={scrollContainerRef} className="overflow-x-auto relative z-0 pl-0">
+          <table className="w-max border-collapse">
+            <thead>
+              <tr className="h-16">
+                <th className="sticky top-0 left-0 z-40 bg-paper border-b-2 border-stone-900 text-left px-2 md:px-4 text-base md:text-xl font-bold text-ink-red shadow-[2px_0_5px_rgba(0,0,0,0.05)] w-[8.5rem] md:w-[16rem] min-w-[8.5rem] md:min-w-[16rem]">Student Name</th>
+                <th className="sticky top-0 left-[8.5rem] md:left-[16rem] z-40 bg-paper border-b-2 border-stone-900 text-center px-1 text-base md:text-xl font-bold text-ink-red shadow-[2px_0_5px_rgba(0,0,0,0.05)] w-[2.5rem] md:w-[6rem] min-w-[2.5rem] md:min-w-[6rem]">Roll</th>
+                {days.map(d => {
+                  const dayName = getDayLabel(d, activeMonth);
+                  const isSun = isSunday(d, activeMonth);
+                  const isHol = activeClass.holidays?.[activeMonth]?.includes(d) || isSun;
+                  
+                  return (
+                    <th 
+                        key={d} 
+                        ref={isCurrentMonthActive && d === currentRealDay ? currentDayRef : null} 
+                        onClick={() => toggleHoliday(d)}
+                        className={`sticky top-0 z-30 border-b-2 border-stone-900 border-r border-blue-200 min-w-[3rem] md:min-w-[4.5rem] text-center font-sans py-2 bg-paper group cursor-pointer hover:bg-stone-50 transition-colors
+                            ${isCurrentMonthActive && d === currentRealDay ? 'bg-yellow-400 border-b-ink-blue border-b-4' : ''}
+                            ${isHol ? 'bg-red-50 text-red-800' : 'text-stone-700'}
+                        `}
+                        title={isSun ? "Sunday" : "Click to toggle holiday"}
+                    >
+                      <div className="flex flex-col items-center justify-center leading-tight">
+                        <span className={`text-[0.65rem] md:text-xs font-normal uppercase ${isHol ? 'text-red-500 font-bold' : 'text-stone-500'}`}>{dayName}</span>
+                        <span className={`text-sm md:text-lg font-bold ${isHol ? 'text-red-600' : ''}`}>{d}</span>
+                        {isHol && !isSun && <div className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-red-500"></div>}
+                      </div>
+                    </th>
+                  );
+                })}
+                <th className="sticky top-0 z-40 bg-paper border-b-2 border-stone-900 text-center px-1 text-sm md:text-lg shadow-[-2px_0_5px_rgba(0,0,0,0.05)] w-12 md:w-16 min-w-[3rem] right-12 md:right-16"><span className="text-green-700 font-bold">P</span></th>
+                <th className="sticky top-0 right-0 z-40 bg-paper border-b-2 border-stone-900 text-center px-1 text-sm md:text-lg shadow-[-2px_0_5px_rgba(0,0,0,0.05)] w-12 md:w-16 min-w-[3rem]"><span className="text-red-700 font-bold">A</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {activeClass.students.map((student) => {
+                const stats = getStudentStats(student.id);
+                return (
+                  <tr key={student.id} className="h-16 hover:bg-yellow-50 transition-colors group">
+                    <td className="sticky left-0 z-20 bg-paper border-b border-blue-200 px-2 md:px-4 font-semibold text-sm md:text-lg whitespace-nowrap group-hover:bg-yellow-50 shadow-[2px_0_5px_rgba(0,0,0,0.05)] w-[8.5rem] md:w-[16rem] min-w-[8.5rem] md:min-w-[16rem]">
+                       <div className="flex justify-between items-center group/cell w-full">
+                          <span className="truncate pr-2" title={student.name}>{student.name}</span>
+                          {!isViewerMode && (
+                            <button onClick={(e) => requestDeleteStudent(e, student)} className="text-stone-300 hover:text-red-600 opacity-0 group-hover/cell:opacity-100 transition-all p-1" title="Remove Student">
+                                <Trash2 size={16} />
+                            </button>
+                          )}
+                       </div>
+                    </td>
+                    <td className="sticky left-[8.5rem] md:left-[16rem] z-20 bg-paper border-b border-blue-200 text-center text-stone-600 text-sm md:text-lg group-hover:bg-yellow-50 shadow-[2px_0_5px_rgba(0,0,0,0.05)] w-[2.5rem] md:w-[6rem] min-w-[2.5rem] md:min-w-[6rem]">{student.rollNo}</td>
+                    {days.map(d => {
+                      const isSun = isSunday(d, activeMonth);
+                      const isHol = activeClass.holidays?.[activeMonth]?.includes(d) || isSun;
+                      const status = activeClass.attendance[activeMonth]?.[student.id]?.[d];
+                      const isToday = isCurrentMonthActive && d === currentRealDay;
+                      
+                      return (
+                        <td 
+                            key={d} 
+                            onClick={() => handleCellClick(student.id, d, isHol)} 
+                            className={`
+                                border-b border-blue-200 border-r border-blue-100 min-w-[3rem] md:min-w-[4.5rem] text-center select-none relative h-16 
+                                ${!isViewerMode && !isHol ? 'cursor-pointer hover:bg-blue-50/20' : 'cursor-default'} 
+                                ${isToday && !isHol ? 'bg-yellow-200' : ''}
+                                ${isHol ? 'bg-stone-200/60' : ''}
+                            `}
+                        >
+                          {isHol ? null : (
+                              <>
+                                {status === 'P' && <span className="text-ink-blue font-bold text-xl md:text-2xl animate-in fade-in zoom-in duration-100">P</span>}
+                                {status === 'A' && <span className="text-ink-red font-bold text-xl md:text-2xl animate-in fade-in zoom-in duration-100">A</span>}
+                              </>
+                          )}
+                        </td>
+                      );
+                    })}
+                    <td className="sticky z-20 bg-paper border-b border-blue-200 text-center font-bold text-lg md:text-xl text-green-700 bg-opacity-90 group-hover:bg-yellow-50 shadow-[-2px_0_5px_rgba(0,0,0,0.05)] w-12 md:w-16 min-w-[3rem] right-12 md:right-16">{stats.presents}</td>
+                    <td className="sticky right-0 z-20 bg-paper border-b border-blue-200 text-center font-bold text-lg md:text-xl text-red-600 bg-opacity-90 group-hover:bg-yellow-50 shadow-[-2px_0_5px_rgba(0,0,0,0.05)] w-12 md:w-16 min-w-[3rem]">{stats.absents}</td>
+                  </tr>
+                );
+              })}
+              {Array.from({length: Math.max(0, 15 - activeClass.students.length)}).map((_, i) => (
+                  <tr key={`empty-${i}`} className="h-16">
+                      <td className="sticky left-0 z-10 bg-paper border-b border-blue-200 shadow-[2px_0_5px_rgba(0,0,0,0.05)] w-[8.5rem] md:w-[16rem] min-w-[8.5rem] md:min-w-[16rem]"></td>
+                      <td className="sticky left-[8.5rem] md:left-[16rem] z-10 bg-paper border-b border-blue-200 shadow-[2px_0_5px_rgba(0,0,0,0.05)] w-[2.5rem] md:w-[6rem] min-w-[2.5rem] md:min-w-[6rem]"></td>
+                      {days.map(d => {
+                           const isSun = isSunday(d, activeMonth);
+                           const isHol = activeClass.holidays?.[activeMonth]?.includes(d) || isSun;
+                           return (
+                               <td key={d} className={`border-b border-blue-200 border-r border-blue-100 min-w-[3rem] md:min-w-[4.5rem] relative ${isCurrentMonthActive && d === currentRealDay ? 'bg-yellow-200' : ''} ${isHol ? 'bg-stone-200/60' : ''}`}>
+                               </td>
+                           );
+                      })}
+                      <td className="sticky z-10 bg-paper border-b border-blue-200 shadow-[-2px_0_5px_rgba(0,0,0,0.05)] w-12 md:w-16 min-w-[3rem] right-12 md:right-16"></td>
+                      <td className="sticky right-0 z-10 bg-paper border-b border-blue-200 shadow-[-2px_0_5px_rgba(0,0,0,0.05)] w-12 md:w-16 min-w-[3rem]"></td>
+                  </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {isAddModalOpen && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-[200] font-sans p-4">
+          <div className="bg-white p-6 rounded shadow-xl w-full max-w-sm animate-in zoom-in duration-200">
+            <h2 className="text-xl font-bold mb-4">Add New Student</h2>
+            <input type="text" value={newStudentName} onChange={(e) => setNewStudentName(e.target.value)} placeholder="Full Name" autoFocus className="w-full border p-2 rounded mb-4 focus:ring-2 focus:ring-blue-500 outline-none" onKeyDown={(e) => e.key === 'Enter' && addStudent()} />
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setIsAddModalOpen(false)} className="px-4 py-2 text-stone-600 hover:bg-stone-100 rounded">Cancel</button>
+              <button onClick={addStudent} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Add</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
