@@ -4,6 +4,9 @@ const URLS_TO_CACHE = [
   '/index.html',
   '/index.tsx',
   '/manifest.json',
+  '/icon.svg',
+  '/icon-192.png',
+  '/icon-512.png',
   'https://cdn.tailwindcss.com'
 ];
 

@@ -1141,61 +1141,63 @@ export function App() {
              </div>
 
              {/* Student/Parent Access (Right Column) */}
-             <div className="lg:w-96">
-                <h2 className="text-2xl font-bold text-stone-700 mb-6 flex items-center gap-2">
-                   <Globe size={24} /> Student / Parent Access
-                </h2>
-                
-                <div className="bg-white p-6 rounded-xl shadow-lg border-2 border-stone-200">
-                    <p className="font-sans text-stone-600 mb-4">Saved Classes</p>
+             <div className="lg:w-96 space-y-8">
+                <div>
+                  <h2 className="text-2xl font-bold text-stone-700 mb-6 flex items-center gap-2">
+                     <Globe size={24} /> Student / Parent Access
+                  </h2>
+                  
+                  <div className="bg-white p-6 rounded-xl shadow-lg border-2 border-stone-200">
+                      <p className="font-sans text-stone-600 mb-4">Saved Classes</p>
 
-                    <div className="space-y-3 mb-6">
-                        {savedCodes.length === 0 && (
-                            <p className="text-sm text-stone-400 italic">No saved codes yet.</p>
-                        )}
-                        {savedCodes.map((saved) => (
-                            <div key={saved.code} className="flex items-center justify-between p-3 bg-stone-50 border border-stone-200 rounded-lg hover:border-ink-blue cursor-pointer group" onClick={() => handleJoinClass(saved.code)}>
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center font-bold text-xs font-sans">
-                                        {saved.name.charAt(0).toUpperCase()}
-                                    </div>
-                                    <div>
-                                        <p className="font-bold text-sm text-ink-black">{saved.name}</p>
-                                        <p className="text-xs text-stone-500 font-mono tracking-wider">{saved.code}</p>
-                                    </div>
-                                </div>
-                                <button onClick={(e) => removeStudentCode(e, saved.code)} className="text-stone-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <X size={16} />
-                                </button>
+                      <div className="space-y-3 mb-6">
+                          {savedCodes.length === 0 && (
+                              <p className="text-sm text-stone-400 italic">No saved codes yet.</p>
+                          )}
+                          {savedCodes.map((saved) => (
+                              <div key={saved.code} className="flex items-center justify-between p-3 bg-stone-50 border border-stone-200 rounded-lg hover:border-ink-blue cursor-pointer group" onClick={() => handleJoinClass(saved.code)}>
+                                  <div className="flex items-center gap-3">
+                                      <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center font-bold text-xs font-sans">
+                                          {saved.name.charAt(0).toUpperCase()}
+                                      </div>
+                                      <div>
+                                          <p className="font-bold text-sm text-ink-black">{saved.name}</p>
+                                          <p className="text-xs text-stone-500 font-mono tracking-wider">{saved.code}</p>
+                                      </div>
+                                  </div>
+                                  <button onClick={(e) => removeStudentCode(e, saved.code)} className="text-stone-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <X size={16} />
+                                  </button>
+                              </div>
+                          ))}
+                      </div>
+
+                      <p className="font-sans text-stone-600 text-sm mb-2">Join a new class</p>
+                      <div className="space-y-3">
+                         <input 
+                           type="text" 
+                           value={viewerCode}
+                           onChange={(e) => setViewerCode(e.target.value.toUpperCase())}
+                           placeholder="Enter Code (e.g. X9Y2Z1)"
+                           className="w-full text-center text-2xl font-mono p-3 border-2 border-stone-300 rounded focus:border-ink-blue focus:outline-none tracking-widest uppercase"
+                           maxLength={6}
+                         />
+                         
+                         <button 
+                           onClick={() => handleJoinClass()}
+                           disabled={viewerLoading || viewerCode.length < 6}
+                           className="w-full bg-stone-800 text-white py-3 rounded font-bold hover:bg-black transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                         >
+                           {viewerLoading ? <Loader2 size={18} className="animate-spin" /> : <>View Register <ArrowRight size={18} /></>}
+                         </button>
+
+                         {viewerError && (
+                            <div className="bg-red-50 text-red-600 p-3 rounded text-center text-sm border border-red-100 flex items-center justify-center gap-2">
+                               <AlertTriangle size={16} /> {viewerError}
                             </div>
-                        ))}
-                    </div>
-
-                    <p className="font-sans text-stone-600 text-sm mb-2">Join a new class</p>
-                    <div className="space-y-3">
-                       <input 
-                         type="text" 
-                         value={viewerCode}
-                         onChange={(e) => setViewerCode(e.target.value.toUpperCase())}
-                         placeholder="Enter Code (e.g. X9Y2Z1)"
-                         className="w-full text-center text-2xl font-mono p-3 border-2 border-stone-300 rounded focus:border-ink-blue focus:outline-none tracking-widest uppercase"
-                         maxLength={6}
-                       />
-                       
-                       <button 
-                         onClick={() => handleJoinClass()}
-                         disabled={viewerLoading || viewerCode.length < 6}
-                         className="w-full bg-stone-800 text-white py-3 rounded font-bold hover:bg-black transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                       >
-                         {viewerLoading ? <Loader2 size={18} className="animate-spin" /> : <>View Register <ArrowRight size={18} /></>}
-                       </button>
-
-                       {viewerError && (
-                          <div className="bg-red-50 text-red-600 p-3 rounded text-center text-sm border border-red-100 flex items-center justify-center gap-2">
-                             <AlertTriangle size={16} /> {viewerError}
-                          </div>
-                       )}
-                    </div>
+                         )}
+                      </div>
+                  </div>
                 </div>
              </div>
           </div>
