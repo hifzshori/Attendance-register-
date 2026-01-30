@@ -1,0 +1,17 @@
+{
+  "name": "Class Registers",
+  "short_name": "Registers",
+  "description": "Manage attendance, chat, and shared class registers.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fdfbf7",
+  "theme_color": "#0055D4",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512"
+    }
+  ]
+}
